@@ -3,6 +3,7 @@ import sys
 import json
 import urllib.request
 import urllib.error
+import time
 
 def main():
     gemini_key = os.environ.get("GEMINI_API_KEY")
@@ -105,25 +106,72 @@ def main():
         }
     }
 
-    print("Calling Gemini 2.5 Flash API...")
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}
+    fallback_template = (
+        "## 📌 작업 개요 (PR Type)\n"
+        "<!-- 작업 내용에 해당하는 유형에 ☐를 ☑로 표시해 주세요. -->\n"
+        "- ☐ 새로운 기능 추가 (Feature)\n"
+        "- ☐ 버그 수정 (Bug Fix)\n"
+        "- ☐ 코드 리팩터링 (Refactor)\n"
+        "- ☐ UI/스타일 작업 (Design)\n"
+        "- ☐ 문서 수정/추가 (Docs)\n"
+        "- ☐ 테스트 코드 추가 (Test)\n"
+        "- ☐ 기타/설정 변경 (Chore)\n\n"
+        "---\n\n"
+        "## 📝 작업 내용 (Description)\n"
+        "<!-- 이번 PR에서 변경된 핵심 내용을 간략하게 설명해 주세요. -->\n"
+        "- \n\n"
+        "---\n\n"
+        "## 🔗 연관 이슈 (Related Issues)\n"
+        "<!-- 해결된 이슈 번호가 있다면 적어주세요. 예: Closes #123 -->\n"
+        "- Closes #\n\n"
+        "---\n\n"
+        "## 🧪 테스트 및 검증 (Verification Checklist)\n"
+        "<!-- PR 병합 전에 아래 사항들을 모두 확인했는지 체크해 주세요. -->\n"
+        "- [ ] 개발 환경에서 빌드 및 컴파일에 성공했나요?\n"
+        "- [ ] 작업한 기능에 대한 테스트를 진행했거나 테스트 코드를 작성했나요?\n"
+        "- [ ] 불필요한 콘솔 로그(`console.log`, `print` 등)나 주석을 제거했나요?\n"
+        "- [ ] 코드 스타일 가이드(eslint, prettier 등)를 준수했나요?\n"
     )
 
-    try:
-        with urllib.request.urlopen(req) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            generated_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except urllib.error.HTTPError as e:
-        print(f"HTTP Error calling Gemini API: {e.code} - {e.read().decode('utf-8')}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Unexpected error calling Gemini API: {e}")
-        sys.exit(1)
+    generated_text = None
+    max_retries = 3
+    retry_delay = 2 # seconds
+    is_fallback = False
 
-    print("Gemini response generated successfully.")
+    for attempt in range(1, max_retries + 1):
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                generated_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                print("Gemini response generated successfully.")
+                break
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8')
+            print(f"HTTP Error calling Gemini API (Attempt {attempt}): {e.code} - {err_body}")
+            if e.code in [429, 503, 500, 504] and attempt < max_retries:
+                print(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2
+            else:
+                break
+        except Exception as e:
+            print(f"Unexpected error calling Gemini API (Attempt {attempt}): {e}")
+            if attempt < max_retries:
+                print(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2
+            else:
+                break
+
+    if not generated_text:
+        print("Warning: Failed to generate PR description after retries. Falling back to the empty template.")
+        generated_text = fallback_template
+        is_fallback = True
 
     # Update Pull Request body via GitHub API
     # PATCH /repos/{owner}/{repo}/pulls/{pull_number}
@@ -156,8 +204,14 @@ def main():
     # Post a comment to trigger GitHub mobile notification
     if pr_author:
         comment_url = f"https://api.github.com/repos/{repository}/issues/{pr_number}/comments"
+        
+        if is_fallback:
+            comment_body = f"⚠️ @pileuszu @{pr_author} Gemini API 일시적 오류(503)로 인해 기본 템플릿으로 생성되었습니다. PR 내용을 수동으로 기재해 주세요."
+        else:
+            comment_body = f"🤖 @pileuszu @{pr_author} PR 분석 및 본문 작성이 완료되었습니다! 변경 사항을 확인하고 피드백해 주세요."
+            
         comment_payload = {
-            "body": f"🤖 @pileuszu @{pr_author} PR 분석 및 본문 작성이 완료되었습니다! 변경 사항을 확인하고 피드백해 주세요."
+            "body": comment_body
         }
         req_comment = urllib.request.Request(
             comment_url,
