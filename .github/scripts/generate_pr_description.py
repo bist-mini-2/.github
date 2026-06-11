@@ -78,20 +78,13 @@ def main():
         "- [ ] 작업한 기능에 대한 테스트를 진행했거나 테스트 코드를 작성했나요?\n"
         "- [x] 불필요한 콘솔 로그(`console.log`, `print` 등)나 주석을 제거했나요? (기본 체크)\n"
         "- [x] 코드 스타일 가이드(eslint, prettier 등)를 준수했나요? (기본 체크)\n"
-        "\n"
-        "---\n"
-        "\n"
-        "## 🖼️ 스크린샷/미디어 (Screenshots)\n"
-        "| 변경 전 (Before) | 변경 후 (After) |\n"
-        "| :---: | :---: |\n"
-        "| 여기에 이미지 추가 | 여기에 이미지 추가 |\n"
         "```\n\n"
         "Rules:\n"
         "1. Identify the PR Type based on the diff and mark '[x]' accordingly (can check multiple if appropriate).\n"
         "2. Keep the 'Description' concise, clear, and professional in Korean.\n"
         "3. For the checkboxes under '🧪 테스트 및 검증', if the diff contains test files (e.g. tests/, test_*.py, *.test.js, Spec), check the test box as well.\n"
         "4. Do not include markdown code block syntax (like ```markdown) around the generated template. Just output the raw markdown content directly.\n"
-        "5. Leave the 'Related Issues' and 'Screenshots' tables as placeholders for the user to edit if needed."
+        "5. Leave the 'Related Issues' as placeholders for the user to edit if needed."
     )
 
     # Call Gemini API
