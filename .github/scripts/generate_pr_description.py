@@ -163,7 +163,7 @@ def main():
     if pr_author:
         comment_url = f"https://api.github.com/repos/{repository}/issues/{pr_number}/comments"
         comment_payload = {
-            "body": f"🤖 @{pr_author} PR 분석 및 본문 작성이 완료되었습니다! 변경 사항을 확인하고 피드백해 주세요."
+            "body": f"🤖 @pileuszu @{pr_author} PR 분석 및 본문 작성이 완료되었습니다! 변경 사항을 확인하고 피드백해 주세요."
         }
         req_comment = urllib.request.Request(
             comment_url,
